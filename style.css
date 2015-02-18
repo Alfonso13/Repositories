@@ -1,0 +1,24 @@
+body {
+	font-family: 'Roboto', sans-serif;
+	margin: 0;
+	padding: 0;
+}
+.align-center{text-align:center;}
+.header {
+	background: #F14440;
+	color: #FFF;
+	padding: 4.5em;
+}
+.header h1{
+	font-size: 4em;
+	text-shadow: 5px 2px 8px rgba(0,0,0,0.7);
+	text-decoration: underline;
+	margin: 0 0 0.1em 0;
+}
+.margin-top{margin-top: 2em;}
+.no-margin{margin: 0;}
+.no-padding{padding: 0;}
+.section {
+	padding: 1em;
+	width: 100%;
+}
