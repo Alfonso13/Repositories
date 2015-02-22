@@ -11,7 +11,6 @@
 		<h1 class="align-center">TAKALIK.JS</h1>
 		<h3 class="align-center no-margin no-padding">A simply library from WebSQL, IndexedDB and localStorage :)</h3>
 	</header>
-	<button class="button">HI</button>
 	<section class="section">
 		<article>
 			<header>
@@ -32,11 +31,8 @@
 	</section>
 	<script src="Takalik.js"></script>
 	<script>
-		var database = Takalik.localIndexedDB.createDB({name:"alfonso"}, function callback(response){
-			if(response.status == 'ok') {}
-		});
 		addEventListener("load", function load(){
-			console.log(database);
+			var elemento = document.getElementById("miBoton");
 		});
 	</script>
 </body>

@@ -1,7 +1,7 @@
 //Author: Alfonso Piedrasanta
 (function (){
 	var Takalik=this.Takalik={};
-	var _ObjectProto = Object.prototype.toString;
+	var _ObjectProto=Object.prototype.toString;
 
 	var addEvent = function addEvent(element, event, callback){
 		if( window.addEventListener ) {
@@ -37,6 +37,10 @@
 		},
 		isString: function isString(str){
 			if(_ObjectProto.call(str) === "[object String]") return true;
+			return false;
+		},
+		isFunction: function isFunction(fn){
+			if(_ObjectProto.call(fn) === "[object Function]") return true;
 			return false;
 		},
 		hasProperty: function hasProperty(element, property){
@@ -129,16 +133,36 @@
 			}
 		},
 		extend:function extend(superClass,subClass,callback,context){
-			Takalik.utils.each(superClass,function each(el){
-				subClass[el]=superClass[el];
-			});
+			context = context || {};
+			if(Takalik.utils.isObject(superClass)){
+				Takalik.utils.each(superClass,function each(el){
+					if(Takalik.utils.isObject(subClass)){
+						if(!Takalik.utils.hasProperty(subClass,el)){
+							subClass[el]=superClass[el];
+						}
+					}
+					if(Takalik.utils.isFunction(subClass)){
+						if(!Takalik.utils.hasProperty(subClass.prototype,el)){
+							subClass.prototype[el]=superClass[el];
+						}	
+					}
+					
+				});
+				subClass.superclass = superClass.prototype;
+			}
+
+			if(Takalik.utils.isFunction(superClass)){
+				Takalik.utils.each(superClass.prototype, function each(property){
+					if(!Takalik.utils.hasProperty(subClass))
+				});
+			}
 		}
 	};
 
 	function executeSql(database,request,data,success,error){
 		database.transaction(function (tx){tx.executeSql(request,data,function (a,b){success(b);}, function (a){error(a);});});
 		return false;
-	}
+	};
 
 	function ModelTable(db,properties){
 		var nameTable=properties.name,
@@ -152,10 +176,9 @@
 		db.tables.push(nameTable);
 		
 		var fields_names = fields.map(function (field){
-			var field_={};
+			var _field={};
 			var isPrimaryKey=function isPrimaryKey(element){
-				if(element.match("PRIMARY KEY"))
-				{
+				if(element.match("PRIMARY KEY")) {
 					return true;
 				}
 				return false;	
@@ -167,12 +190,12 @@
 				}
 				return "TEXT";
 			};
-			field_.name = field.split(" ")[0];
-			field_.isPrimaryKey = function (){
+			_field.name = field.split(" ")[0];
+			_field.isPrimaryKey = function (){
 				return isPrimaryKey(field);
 			};
-			field_.type = fieldType(field);
-			return field_;
+			_field.type = fieldType(field);
+			return _field;
 		});
 		
 		function fieldsTableToString(names){
@@ -195,7 +218,8 @@
 			return _elements;
 		}
 
-		newTable.find = function (data,callback){
+		newTable.find = function find(data,callback){
+			/*Incomplete*/
 			var elements = data.elements,
 				request;
 			
@@ -222,7 +246,7 @@
 			return newTable;
 		};
 
-		newTable.update=function (options,callback){
+		newTable.update=function update(options,callback){
 			var elements=[],
 				request="UPDATE " + nameTable + " SET ";
 
@@ -246,7 +270,7 @@
 			});
 		};
 
-		newTable.delete = function (properties,callback){
+		newTable.delete = function(properties,callback){
 			var request = "DELETE FROM " + nameTable;
 			
 			if(properties.condition != undefined) request+=" WHERE "+properties.condition.join(" ");
@@ -322,6 +346,9 @@
 		this.version = props.version;
 		this.db = window.openDatabase(props.name,props.version,props.description,props.space.size);
 		this.tables = [];
+		this.update = function update(){
+
+		};
 		return this;
 	}
 	ModelDB.prototype = {
@@ -344,6 +371,12 @@
 				this.__defineTable(property);
 			},this);
 		},
+		destroyTable: function destroyTable(){
+			return "In construction";
+		},
+		getTables: function getTables(){
+
+		}
 	};
 	Takalik.localSQL={
 		createDB: function createDB(props){
@@ -375,9 +408,13 @@
 		range: window.IDBKeyRange || window.webkitIDBKeyRange || window.mozIDBKeyRange,
 		cursor: window.IDBCursor || window.webkitIDBCursor || window.mozIDBCursor
 	};
-	
-	/*var _this = this; var _request = providersIndexedDB.database.open(props.name); Takalik.utils.listener(_request, {success: function success(database){callback({status: 'ok'}); _this.database = database.target.result || database.target; _this.name = props.name; _this.createStore = function createStore(store){if(store && Takalik.utils.isObject(store)){_this[store.name] = new ModelStoreIndexedDB(store); } else {return console.error("Properties of Store is not defined"); } }; }, error: function error(){callback({status:'fail'}); }, upgradeneeded: function upgradeneeded(){} });*/
+
+	var requestIDB = function (props){
+		return providersIndexedDB.database.open(props.name);
+	};
+
 	function ModelIndexedDB(props,callback) {
+
 	};
 
 	function ModelStoreIndexedDB(props){
@@ -385,20 +422,16 @@
 		this.description = props.description;
 	};
 	ModelStoreIndexedDB.prototype = {
-		find: function find(){
-
-		},
-		add: function add(){
-
-		},
-		update: function update(){
-
-		}
+		find: function find(){},
+		add: function add(){},
+		update: function update(){}
 	};
 	Takalik.localIndexedDB = {
 		createDB: function createDB(props,callback){
 			if(!props)return console.error("Properties of database are undefined");
-			return new ModelIndexedDB(props,callback);
+			return function (){
+
+			};
 		},
 		destroyDB: function destroyDB(){
 

@@ -3,13 +3,14 @@ body {
 	margin: 0;
 	padding: 0;
 }
-.align-center{text-align:center;}
+.align-center {text-align:center;}
 .header {
 	background: #F14440;
+	box-shadow: 0 4px 20px #444;
 	color: #FFF;
 	padding: 4.5em;
 }
-.header h1{
+.header h1 {
 	font-size: 4em;
 	text-shadow: 5px 2px 8px rgba(0,0,0,0.7);
 	text-decoration: underline;
