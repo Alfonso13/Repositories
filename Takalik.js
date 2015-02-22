@@ -1,6 +1,6 @@
-//Author: Alfonso Piedrasanta
 (function (){
 	var Takalik=this.Takalik={};
+	Takalik.VERSION = "0.0.1";
 	var _ObjectProto=Object.prototype.toString;
 
 	var addEvent = function addEvent(element, event, callback){
