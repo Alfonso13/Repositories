@@ -153,7 +153,8 @@
 
 			if(Takalik.utils.isFunction(superClass)){
 				Takalik.utils.each(superClass.prototype, function each(property){
-					if(!Takalik.utils.hasProperty(subClass))
+					/*construction*/
+					/*if(!Takalik.utils.hasProperty(subClass))*/
 				});
 			}
 		}
@@ -414,7 +415,7 @@
 	};
 
 	function ModelIndexedDB(props,callback) {
-
+		this.name = props.name;
 	};
 
 	function ModelStoreIndexedDB(props){
@@ -429,9 +430,18 @@
 	Takalik.localIndexedDB = {
 		createDB: function createDB(props,callback){
 			if(!props)return console.error("Properties of database are undefined");
-			return function (){
+			var _request = providersIndexedDB.database.open(props.name);
+			var model;
+			Takalik.utils.listener(_request, {
+				success: function success(database){
+					model = database.target.result;
+				},
+				error: function error(){},
+				upgradeneeded: function upgradeneeded(){}
+			});
 
-			};
+			setTimeout(function (){},4000);
+			return model;
 		},
 		destroyDB: function destroyDB(){
 

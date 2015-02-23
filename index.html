@@ -32,7 +32,8 @@
 	<script src="Takalik.js"></script>
 	<script>
 		addEventListener("load", function load(){
-			var elemento = document.getElementById("miBoton");
+			var database = Takalik.localIndexedDB.createDB({name:"alfonso"});
+			console.log(database);
 		});
 	</script>
 </body>
