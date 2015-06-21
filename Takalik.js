@@ -15,6 +15,8 @@
 		}
 	};
 
+	/*Takalik.form = {validate: function validate(options){if(Takalik.utils.isObject(options)) {if(Takalik.utils.isString(options.form)) {var form = Takalik.utils.getElement(options.form); if(form) {Takalik.utils.listener(form, {input: function input(target){var input = target.target; if(input.validity.valid) {if(document.querySelector(".message-form-error")) {document.querySelector(".message-form-error").style.display = "none"; } input.style.background = "white"; } else {var message = document.createElement("span"); var parent = input.parentNode; if(!document.querySelector(".message-form-error")) {message.className = "message-form-error"; message.innerText = "Error"; parent.appendChild(message); } } } }); } else {console.log("Hola"); } } } } };*/
+	
 	Takalik.utils={
 		isObject:function isObject(object){
 			if(_ObjectProto.call(object) === "[object Object]") return true;
@@ -97,12 +99,12 @@
 					if(node_element) {
 						return node_element;
 					}
-					return element + " not exists in document";
+					return null;
 				}
 			}
-			return "UNDEFINED";
+			return null;
 		},
-		listener: function listener(element, events) {
+		listener: function listener(element, events, context) {
 			if(events) {
 				if(!Takalik.utils.isObject(events)){
 					return console.error("Events is not an object");
@@ -146,223 +148,370 @@
 							subClass.prototype[el]=superClass[el];
 						}	
 					}
-					
 				});
 				subClass.superclass = superClass.prototype;
 			}
 
-			if(Takalik.utils.isFunction(superClass)){
-				Takalik.utils.each(superClass.prototype, function each(property){
-					/*construction*/
-					/*if(!Takalik.utils.hasProperty(subClass))*/
-				});
-			}
+			/*if(Takalik.utils.isFunction(superClass)){Takalik.utils.each(superClass.prototype, function each(property){if(!Takalik.utils.hasProperty(subClass) || !Takalik.utils.hasProperty(subClass.prototype)) {} }); }*/ 
 		}
 	};
 
 	function executeSql(database,request,data,success,error){
-		database.transaction(function (tx){tx.executeSql(request,data,function (a,b){success(b);}, function (a){error(a);});});
+		database.transaction(function (tx){tx.executeSql(request,data,function (a,b){success(b);return true;}, function (a){error(a);return true;});});
 		return false;
 	};
 
 	function ModelTable(db,properties){
-		var nameTable=properties.name,
-			newTable={},
-			fields=properties.fields.map(function (property) {
-  				return property.name + ' ' + (property.type || "TEXT");
-			});
+		var accepted_operators = ["||", "*", "/", "%", "+", "-", "<<", ">>", "&", "|", "<", "<=", ">", ">=", "=", "==", "<>", "!=", "IN", "AND", "OR", "IS", "LIKE", "GLOB"];
+		var nameTable=properties.name;
+		var newTable=this;
+		var hasPrimaryKey = false;
 
-		executeSql(db.db,"CREATE TABLE IF NOT EXISTS " + nameTable + " ( "+ fields.join(", ") +" ) ", [], function (){}, function (){});
-		console.log("CREATE TABLE IF NOT EXISTS " + nameTable + " ( "+ fields.join(", ") +" ) ");
-		db.tables.push(nameTable);
-		
-		var fields_names = fields.map(function (field){
-			var _field={};
-			var isPrimaryKey=function isPrimaryKey(element){
-				if(element.match("PRIMARY KEY")) {
-					return true;
-				}
-				return false;	
-			};
-
-			var fieldType = function fieldType(element){
-				if(element.toUpperCase().match("INTEGER|TEXT|NULL|REAL|BLOB")){
-					return element.toUpperCase().match("INTEGER|TEXT|NULL|REAL|BLOB")[0];
-				}
-				return "TEXT";
-			};
-			_field.name = field.split(" ")[0];
-			_field.isPrimaryKey = function (){
-				return isPrimaryKey(field);
-			};
-			_field.type = fieldType(field);
-			return _field;
-		});
-		
-		function fieldsTableToString(names){
-			var _elements = [];
-			names.forEach(function (val){
-				if(!val.isPrimaryKey()){
-					_elements.push(val.name);
+		var fields = properties.fields.map(function (property) {
+  				var notNull = (property.notNull && property.notNull == true) ? " NOT NULL" : "";
+  				if(!hasPrimaryKey && property.primary) {
+  					var structure_pk = "";
+  					hasPrimaryKey = true;
+  					if(property.increment) {
+  						structure_pk += property.name + " INTEGER PRIMARY KEY AUTOINCREMENT" + notNull ;
+  					}
+  					else {
+  						structure_pk += property.name + " " + property.type + " PRIMARY KEY" + notNull;
+  					}
+  					return structure_pk;
+  				}
+  				var namefield = property.name;
+  				if(property.type && property.type.toUpperCase().match("INTEGER|TEXT|NULL|REAL|BLOB") ) {
+  					return namefield += ' ' + property.type + notNull; 
+  				}
+  				return namefield += ' TEXT' + notNull;
+			});
+		var table;
+		var foreignsql = [];
+		var prefix_on = "ON";
+		var aux = "";
+		if(properties.fields.forEach) {
+			properties.fields.forEach(function each(_table, index){
+				if(_table.foreignWith) {
+					table = _table.foreignWith.table;
+					var field_foreign = _table.foreignWith.field;
+					if(_table.foreignWith.cascade) {
+						if(_table.foreignWith.cascade.delete) {
+							aux += prefix_on + " DELETE CASCADE ";
+						}
+						if(_table.foreignWith.cascade.update) {
+							aux += prefix_on + " UPDATE CASCADE ";
+						}
+					}
+					if(aux.length > 0) {
+						foreignsql.push("FOREIGN KEY("+ _table.name +") REFERENCES "+ table +"("+ field_foreign +") "+ aux);
+					}
+					else {
+					foreignsql.push("FOREIGN KEY("+ _table.name +") REFERENCES "+ table +"("+ field_foreign +")");
+					}
 				}
 			});
-			return _elements;
-		};
-		function fieldsTableType(names){
-			var _elements = {};
-
-			names.forEach(function (val){
-				if(!val.isPrimaryKey()){
-					_elements[val.name] = val.type;
-				}
-			});
-			return _elements;
+		}
+		if(foreignsql.length > 0) {
+			foreignsql.forEach(function each(foreignkey,index){
+				fields.push(foreignkey);
+			})
 		}
 
-		newTable.find = function find(data,callback){
-			/*Incomplete*/
-			var elements = data.elements,
-				request;
-			
-			request = "SELECT " + elements.join(",") + " FROM " + nameTable;
-
-			if(data.condition) request += " WHERE " + data.condition.join(" ");
-			if(data.limit) request +=" LIMIT "+data.limit;
-
-			executeSql(db.db,request,[], function (result){
-				if(result.rows && result.rows.length > 1){
-					var results = [];
-					for(var i = 0,len = result.rows.length; i < len ; i++){
-						results.push(result.rows.item(i));
-					}
-					callback(results);
-				}
-				else
-				{
-					callback(result.rows.item(0));
-				}
-			}, function (error){
-				callback(null);
-			});
-			return newTable;
-		};
-
-		newTable.update=function update(options,callback){
-			var elements=[],
-				request="UPDATE " + nameTable + " SET ";
-
-			for(var i in options.elements)
-			{
-				for(var j in options.elements[i])
-				{
-					elements.push(j+"="+options.elements[i][j]);	
-				}
-			}
-			request += elements.join(",");
-			if(options.condition != undefined)
-			{
-				request += " WHERE " + options.condition.join(" ");	
-			}
-
-			executeSql(db.db,request,[], function (result){
-				console.log(result);
-			}, function (e){
-				console.log(e);
-			});
-		};
-
-		newTable.delete = function(properties,callback){
-			var request = "DELETE FROM " + nameTable;
-			
-			if(properties.condition != undefined) request+=" WHERE "+properties.condition.join(" ");
-
-			executeSql(db.db,request,[], function (a){
-				if(a.rowsAffected > 0) return callback(true);
-				return callback(false);
-			}, function (e){
-				callback(e);
-			});
-		};
-
-		newTable.add=function add(elements, callback){
-			var _elements = fieldsTableToString(fields_names),
-				_elementsToString = _elements.join(", "), 
-				_elementsType = fieldsTableType(fields_names),
-				request = "INSERT INTO "+nameTable+"("+ _elementsToString +") VALUES ",
-				values = [],
-				rowInsert = 0,
-				rowNotInserted = 0,
-				temporal = [];
-
-			if(Takalik.utils.isObject(elements)) elements = [elements];
-			
-			for(var i in elements)
-			{
-				for(var j in elements[i])
-				{
-					if(_elementsToString.match(j))
-					{
-						if(_elementsType[j] == "TEXT")
-						{
-							temporal.push("'"+(elements[i][j]).trim()+"'");	
-							continue;
+		executeSql(db.db,"CREATE TABLE IF NOT EXISTS " + nameTable + " ( "+ fields.join(", ") +" ) ", [], function success(l){	
+			db.tables.push(nameTable);
+			var fields_names = fields.map(function (field){
+				var _field = {
+					isPrimaryKey: function isPrimaryKey(){return !false;}
+				};
+				if(field.split(" ")[0].toUpperCase() != "FOREIGN") {	
+					var isPrimaryKey=function isPrimaryKey(element){
+						if(element.match("PRIMARY KEY AUTOINCREMENT")) {
+							return true;
 						}
-						temporal.push((elements[i][j]).trim());	
-					}
-					continue;
+						return false;	
+					};
+					var fieldType = function fieldType(element){
+						if(element.toUpperCase().match("INTEGER|TEXT|NULL|REAL|BLOB")){
+							return element.toUpperCase().match("INTEGER|TEXT|NULL|REAL|BLOB")[0];
+						}
+						return "TEXT";
+					};
+					_field.name = field.split(" ")[0];
+					_field.isPrimaryKey = function (){
+						return isPrimaryKey(field);
+					};
+					_field.type = fieldType(field);
 				}
-				values.push("INSERT INTO "+nameTable + "("+ _elementsToString +") VALUES ("+ temporal.join(", ") +")")
-				temporal.length = 0;
-			}
-
-			var returnCallback=function returnCallback(count){
-				if(count == values.length){
-					callback({
-						rowsToInsert: values.length,
-						rowsInserted: rowInsert,
-						rowsFails: rowNotInserted,
-						finished: true
-					});
-				}
-			}
-			
-			values.forEach(function (val){
-				executeSql(db.db, val,[], function (a){
-					rowInsert += 1;
-					returnCallback(rowInsert);
-				}, function (a){
-					rowNotInserted += 1;
-					returnCallback(rowInsert);
-				});
+				return _field;
 			});
 
-		};
-		return newTable;
+			function fieldsTableToString(names){
+				var _elements = [];
+				names.forEach(function (val){
+					if(!val.isPrimaryKey()){
+						_elements.push(val.name);
+					}
+				});
+				return _elements;
+			};
+			function fieldsTableType(names){
+				var _elements = {};
+
+				names.forEach(function (val){
+					if(!val.isPrimaryKey()){
+						_elements[val.name] = val.type;
+					}
+				});
+				return _elements;
+			}
+
+			newTable.find = function find(data,callback){
+				/*Incomplete*/
+				var elements = data.fields,
+					request;
+				
+				request = "SELECT " + elements.join(",") + " FROM " + nameTable;
+
+				if(data.condition) request += " WHERE " + data.condition.join(" ");
+				if(data.limit) request +=" LIMIT "+data.limit;
+
+				executeSql(db.db,request,[], function (result){
+					if(result.rows && result.rows.length > 1){
+						var results = [];
+						for(var i = 0,len = result.rows.length; i < len ; i++){
+							results.push(result.rows.item(i));
+						}
+						callback(results);
+					}
+					else
+					{
+						callback(result.rows.item(0));
+					}
+				}, function (error){
+					callback(null);
+				});
+				return newTable;
+			};
+
+			newTable.update=function update(options,callback){
+				var elements=[],
+					request="UPDATE " + nameTable + " SET ";
+
+				for(var i in options.elements)
+				{
+					for(var j in options.elements[i])
+					{
+						elements.push(j+"="+options.elements[i][j]);	
+					}
+				}
+				request += elements.join(",");
+				if(options.condition != undefined)
+				{
+					request += " WHERE " + options.condition.join(" ");	
+				}
+
+				executeSql(db.db,request,[], function (result){
+					console.log(result);
+				}, function (e){
+					console.log(e);
+				});
+			};
+
+			newTable.delete = function (properties,callback){
+				var request = "DELETE FROM " + nameTable;
+				
+				if(properties.condition != undefined) request+=" WHERE "+properties.condition.join(" ");
+
+				executeSql(db.db,request,[], function (a){
+					if(a.rowsAffected > 0) return callback(true);
+					return callback(false);
+				}, function (e){
+					callback(e);
+				});
+			};
+
+			newTable.add = function add(elements, callback){
+				var _elements = fieldsTableToString(fields_names),
+					_elementsToString = _elements.join(", "), 
+					_elementsType = fieldsTableType(fields_names),
+					request = "INSERT INTO "+nameTable+"("+ _elementsToString +") VALUES ",
+					values = [],
+					rowInsert = 0,
+					selectQuery = [],
+					rowNotInserted = 0,
+					temporal = [];
+				if(Takalik.utils.isObject(elements)) {
+					if(elements.select) {
+						var query = "SELECT "+elements.select.fields.join(", ") + " FROM "+elements.select.table;
+						var conditions = [];
+						var array_columns_table_select = db[elements.select.table].getColumns();
+						var columns = {};
+						array_columns_table_select.forEach(function each(column, index){
+							columns[column.column] = column.type
+						});
+
+						if(elements.select.where) {
+							for(var operator in elements.select.where) {
+								if(operator.toUpperCase().match("AND|OR|LIKE|BETWEEN")) {
+									var _aux = elements.select.where[operator];
+									for(var field in _aux) {
+										if (field in columns) {
+											switch(operator.toUpperCase()) {
+												case "LIKE":
+													conditions.push({
+														type		:	operator.toUpperCase(),
+														condition	:	field + " LIKE '" + _aux[field] + "'"
+													});
+													break;
+												case "AND":
+												case "OR":
+													conditions.push({
+														type		: 	operator.toUpperCase(),
+														condition	: 	field + " " + _aux[field].condition + " " + _aux[field].value
+													});
+													break;
+												case "BETWEEN":
+													conditions.push({
+														type		:	operator.toUpperCase(),
+														condition	:	field + " BETWEEN " + _aux[field].from + " AND " + _aux[field].to
+													});
+													break;
+												default:
+													break;
+											}
+										}
+										else {
+											conditions.length = 0;
+											return console.error(field + " is not a column of " + nameTable);
+										}
+									}
+								}
+							}
+							Takalik.utils.each(conditions, function each(value, index){
+								if(index == (conditions.length-1)) {
+									selectQuery.push(value.condition);
+								}
+								else {
+									if(value.type == "AND" || value.type == "OR") {
+										selectQuery.push(value.condition + " " + value.type + " ");
+									}
+									else {
+										selectQuery.push(value.condition + " AND ");
+									}
+								}
+							});
+							query += selectQuery.join("");
+						}
+						var req = "INSERT INTO " + nameTable + " " + query;
+
+						/*executeSql(db.db, req, [], function success(){
+							console.log(arguments);
+						}, function error(){
+							console.log(arguments);
+						});*/
+					}
+					else {
+						elements = [elements];
+						for(var i in elements)
+						{
+							for(var j in elements[i])
+							{
+								if(_elementsToString.match(j))
+								{
+									if(_elementsType[j] == "TEXT")
+									{
+										temporal.push("'"+(elements[i][j]).trim()+"'");	
+										continue;
+									}
+									temporal.push((elements[i][j]).trim());	
+								}
+								continue;
+							}
+							values.push("INSERT INTO "+nameTable + "("+ _elementsToString +") VALUES ("+ temporal.join(", ") +")")
+							temporal.length = 0;
+						}
+
+						var returnCallback=function returnCallback(count){
+							if(count == values.length){
+								callback({
+									rowsToInsert: values.length,
+									rowsInserted: rowInsert,
+									rowsFails: rowNotInserted,
+									finished: true
+								});
+							}
+						}
+
+						values.forEach(function (val){
+							executeSql(db.db, val,[], function (a){
+								/*rowInsert += 1;
+								returnCallback(rowInsert);*/
+								return true;
+							}, function (transaction, error){
+								/*rowNotInserted += 1;
+								returnCallback(rowInsert);*/
+								return true;
+							});
+						});
+					}
+				}
+				else if(Takalik.utils.isString(elements)) {
+					//incomplete
+				}
+				
+			};
+			newTable.begin = function begin(){
+
+			};
+			newTable.addColumn = function addColumn(){
+
+			};
+			newTable.resetIndex = function resetIndex(){
+
+			};
+			newTable.getColumns = function getColumns(){
+				var columns = [];
+				fields_names.forEach(function each(column, index){
+					if(column.name) {
+						columns.push({
+							column 		: 	column.name,
+							type 		: 	column.type,
+							primaryKey 	: 	(column.isPrimaryKey()) ? true : false
+						});
+					} 
+				});
+				return columns;
+			};
+			db[nameTable] = newTable;
+		}, function error(){
+			console.log("Holaaa");
+		});
 	};
 
 	function ModelDB(props){
 		this.name=props.name;
-		this.space = props.space.detail.size + " " +props.space.detail.measure;
+		this.space = props.space.detail.size + " " + (props.space.detail.measure).toLowerCase();
 		this.description = props.description;
 		this.version = props.version;
 		this.db = window.openDatabase(props.name,props.version,props.description,props.space.size);
 		this.tables = [];
 		this.update = function update(){
-
+			
 		};
 		return this;
 	}
 	ModelDB.prototype = {
 		__defineTable: function __defineTable(table){
 			var DB = this;
-
 			var exists_table = false;
 			if(DB.tables.length > 0){
 				Takalik.utils.each(DB.tables,function each(property){
 					if(property==table.name){exists_table=true;return console.error("'"+table.name+"'"+" already exists in database");}
 				},this);
 			}
-			if(!exists_table) DB[table.name]=new ModelTable(DB,table);
+			if(!exists_table) new ModelTable(DB, table);
+			//if(!exists_table) DB[table.name]=new ModelTable(DB,table);
 		},
 		createTable: function createTable(properties){
 			if(!Takalik.utils.isDefined(properties)) return console.error("Table's information is not defined");
@@ -371,6 +520,25 @@
 			Takalik.utils.each(properties, function each(property,value){
 				this.__defineTable(property);
 			},this);
+		},
+		createIndex: function createIndex(){
+			//Incomplete
+		},
+		alterTable: function alterTable(){
+			/*
+				{
+					table: "tabla",
+					addColumn: {
+						name: "alfonso",
+						type: "TEXT"
+					}
+				}
+				or
+				{
+					table: "tabla",
+					addColumns: [{name: "hola",type: "INTEGER"},{name: "testing", type: "TEXT"}]
+				}
+			*/
 		},
 		destroyTable: function destroyTable(){
 			return "In construction";
@@ -403,49 +571,15 @@
 	}
 
 
-	var providersIndexedDB = {
+	/*var providersIndexedDB = {
 		database: window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB,
 		transaction: window.IDBTransaction || window.webkitIDBTransaction || window.mozIDBTransaction,
 		range: window.IDBKeyRange || window.webkitIDBKeyRange || window.mozIDBKeyRange,
 		cursor: window.IDBCursor || window.webkitIDBCursor || window.mozIDBCursor
 	};
 
-	var requestIDB = function (props){
-		return providersIndexedDB.database.open(props.name);
-	};
+	var factoryIdb = function factoryIdb(name,context){};*/
 
-	function ModelIndexedDB(props,callback) {
-		this.name = props.name;
-	};
-
-	function ModelStoreIndexedDB(props){
-		this.name = props.name;
-		this.description = props.description;
-	};
-	ModelStoreIndexedDB.prototype = {
-		find: function find(){},
-		add: function add(){},
-		update: function update(){}
-	};
-	Takalik.localIndexedDB = {
-		createDB: function createDB(props,callback){
-			if(!props)return console.error("Properties of database are undefined");
-			var _request = providersIndexedDB.database.open(props.name);
-			var model;
-			Takalik.utils.listener(_request, {
-				success: function success(database){
-					model = database.target.result;
-				},
-				error: function error(){},
-				upgradeneeded: function upgradeneeded(){}
-			});
-
-			setTimeout(function (){},4000);
-			return model;
-		},
-		destroyDB: function destroyDB(){
-
-		}
-	};
+	Takalik.localIndexedDB = function idb(name){};
 
 }).call(this);

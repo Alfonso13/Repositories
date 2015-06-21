@@ -1,0 +1,13 @@
+Takalik
+- Manejo de WebSQL
+	- Relaciones
+	* SELECT
+		- JOINS
+	* UPDATE
+	* INSERT
+		- NORMAL
+		- POR MEDIO DE UN SELECT
+	* DELETE
+
+- Manejo de IndexedDB
+- Manejo de localStorage

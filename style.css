@@ -23,3 +23,8 @@ body {
 	padding: 1em;
 	width: 100%;
 }
+.message-form-error{
+	color: #F14440;
+	display: inline-block;
+	margin-left: 10px;
+}
